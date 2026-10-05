@@ -1,0 +1,21 @@
+# Données et modèles : propres à chaque nœud, lourds, NE PAS pousser sur Git
+*.csv
+*.joblib
+
+# Journaux de la démo
+logs_*.txt
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Environnement virtuel
+venv/
+.venv/
+
+# Éditeurs / système
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

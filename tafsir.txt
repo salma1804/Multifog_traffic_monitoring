@@ -1,0 +1,55 @@
+Ton exemple dans le bon ordre
+
+À 7:00 : 80 véhicules, 20 km/h.
+
+Étape	Qui	Ce qui se passe
+1	Simulateur	Il reçoit « 80 véhicules, 20 km/h ». Il crée des tâches à faire (préparer, prédire, vérifier)
+2	Preprocessing	Il compare avec les heures d'avant : « avant il y avait 40 véhicules à 50 km/h, maintenant 80 à 20 : ça a beaucoup changé ». Il transforme ça en chiffres : variation +40, vitesse -30, ratio 2
+3	Modèle	Il lit ces chiffres et calcule : « risque d'accident : 0,82 »
+4	Anomalie	Il regarde : « c'est un gros changement d'un coup, donc situation anormale »
+
+
+Les deux autres fichiers servent juste à organiser le travail :
+
+scheduler : décide quelle tâche on fait en premier (les alertes d'abord).
+offloading : décide si on fait la tâche ici ou chez un voisin.
+
+
+
+node_engine.py est le chef de poste du nœud : il reçoit les mesures de l'heure, appelle les autres fichiers dans le bon ordre, puis résume le résultat dans un petit message pour les voisins.
+
+Une précision d'abord. preprocessing.py n'est pas appelé chaque heure. Il tourne une seule fois au démarrage, sur tout le CSV, et le moteur garde la partie « test » (après le 1er mars) en mémoire. Chaque heure, il ne fait que prendre la tranche suivante. On rejoue ainsi des données passées comme si elles arrivaient en direct.
+
+Ce qui se passe à chaque heure (tick), par exemple à 8h :
+
+Il prend les lignes de 8h, soit 8 lignes, une par intersection, avec leurs 58 features déjà calculées.
+Le gardien (anomaly) regarde les 8 lignes. Chacune reçoit un score d'étrangeté.
+La porte : seules les lignes un peu étranges (les 30 % les plus étranges) passent au médecin. Les autres sont déclarées normales, sans calcul.
+Le médecin (modèle) donne un risque d'accident aux lignes qui ont passé la porte.
+L'étiquette de chaque intersection :
+modèle d'accord → critical_accident ;
+trafic anormal mais pas d'accident → congestion ;
+rien d'anormal → normal.
+Le niveau de la zone : s'il y a au moins un accident critique, la zone est en alert ; s'il y a une congestion, elle est en surveillance ; sinon elle est normal.
+Le résumé (NodeSummary) est le petit message : « zone 2, 8h, niveau alert, risque 0.96, intersection INT_002 ».
+
+Les deux autres rôles
+
+build_event : s'il y a une alerte, il prépare le message urgent avec les mesures de l'intersection, pour que les voisins puissent donner leur avis tout de suite.
+confirm : quand un voisin t'envoie une alerte, il refait le calcul avec ton modèle et répond « je confirme » ou « je rejette ».
+
+
+
+
+conclusion:
+config.py : les réglages du nœud (nom, zone, colonnes, date de coupure train/test).
+preprocessing.py : charge le CSV, le nettoie et fabrique les 58 features (variations, moyennes, ratios, heure).
+simulator.py : simule l'arrivée des tâches (features, inférence, anomalie…) avec coût CPU, priorité et deadline.
+scheduler.py : choisit l'ordre de traitement des tâches (FIFO, min-min, max-min, EDF, priority_edf avec les alertes d'abord).
+offloading.py : décide si une tâche s'exécute en local, chez un voisin ou dans le cloud (le plus rapide pour respecter la deadline).
+cache_manager.py : garde en mémoire les résultats déjà calculés (LRU) et précharge ceux qui vont probablement servir.
+model.py : entraîne et charge le RandomForest qui donne le risque d'accident (le médecin).
+anomaly.py : détecte le trafic anormal (le gardien) et ouvre la porte vers le modèle.
+collaboration.py : les messages échangés entre nœuds (résumé, alerte, verdict), le vote de confirmation et la décision régionale.
+node_engine.py : le chef de poste, qui enchaîne gardien, porte, modèle et étiquette à chaque heure et fabrique le résumé.
+api.py : le serveur réseau (FastAPI) qui fait du projet un vrai nœud et parle aux voisins.
